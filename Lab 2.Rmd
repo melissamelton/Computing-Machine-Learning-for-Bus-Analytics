@@ -1,0 +1,253 @@
+---
+title: 'Lab 2: Data Wrangling With Dplyr'
+author: "Melissa Melton"
+date: "9/27/2022"
+output: rmdformats::html_clean
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Setup
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+hiphop <- read.csv('hiphop.csv')
+```
+
+# Summary
+
+1.
+
+```{r}
+hiphop %>%
+  summary()
+```
+
+This dataset contains a dependent variable called familiarity, which ranks a participant's familiarity with a particular African American Vernacular English (AAVE) word/phrase on a scale from 1 to 5. It includes demographic data on the participants in the study, including their sex, age, race, and where they are from. There are also variables representing participants' frequency of interaction with Black individuals, their music preferences. The AAVE words participants were tested on are also, of course, included in this dataset, as well as data on the word's popularity and famous musicians who have used it, and the participants' familiarity with the words. Some variables, such as participants' responses to questions about pop culture, have boolean equivalents, usually representing to what extent the participant correctly answered the question.
+
+2.
+
+```{r}
+# Not choosing to drop NA values for now, as it would drop nearly half the observations
+
+# Convert sex to factor
+
+hiphop <- hiphop %>%
+  mutate(sex = as.factor(sex))
+```
+
+3.
+
+```{r}
+length(unique(hiphop$word))
+```
+64 unique AAVE words were studied in this dataset.
+
+4.
+```{r}
+hiphop <- hiphop %>%
+  mutate(white = ifelse(ethnic == 'white', 'white', 'nonwhite'))
+```
+
+5.
+```{r}
+hiphop_demog <- hiphop %>%
+  distinct(subj, .keep_all = TRUE) %>%
+  select(subj, age, sex, ethnic)
+
+summary(hiphop_demog)
+
+table(hiphop_demog$ethnic)/nrow(hiphop_demog)
+```
+75% of participants are between 18 and 20, so this study is mostly very young adults, but there are some older adults, with ages up to 48. Most participants (about 70%) were female. The participants are overwhelmingly white, at 80%.
+
+6.
+```{r}
+hiphop %>%
+  ggplot(aes(x= sex, y=age, fill=white)) +
+  geom_boxplot() +
+  xlab('Sex') +
+  ylab('Age') +
+  scale_fill_discrete(name = 'Ethnicity', labels = c('Non-White', 'White')) +
+  labs(title = "Boxplot of Participants' Ages by Sex and Ethnicity")
+
+hiphop %>%
+  ggplot(aes(x = ethnic, fill = ethnic)) +
+  geom_bar() +
+  scale_y_continuous(name = 'Count', trans='log10') +
+  scale_fill_discrete(name = 'Ethnicity', labels = c('African', 'Asian', 'Biracial', 'Black', 'Hispanic', 'Indian', 'Native', 'Unknown', 'White')) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+  xlab('') +
+  ggtitle('Number of Participants by Ethnicity')
+```
+
+# Familiar Words
+
+1.
+
+```{r}
+# average familiarity of each word for people < 20
+(hiphop %>%
+  mutate(as.factor(word)) %>%
+  filter(age < 20) %>%
+  group_by(word) %>%
+  mutate(avg_fam = mean(familiarity))%>%
+  select(word, avg_fam) %>%
+  unique() %>%
+  arrange(avg_fam))[c(1,64),]
+
+# average familiarity of each word for non-white women
+# break someone out, dukey rope, plex, and rollie tied for least familiar
+
+(hiphop %>%
+  mutate(as.factor(word)) %>%
+  filter(ethnic != 'white' & sex == 'Female') %>%
+  group_by(word) %>%
+  mutate(avg_fam = mean(familiarity))%>%
+  select(word, avg_fam) %>%
+  unique() %>%
+  arrange(avg_fam))[c(1:4,64),]
+
+# tons of ties for least familiar!
+(hiphop %>%
+  mutate(as.factor(word)) %>%
+  filter(age > 30 & sex == 'Male' & ethnic == 'white') %>%
+  group_by(word) %>%
+  mutate(avg_fam = mean(familiarity))%>%
+  select(word, avg_fam) %>%
+  unique() %>%
+  arrange(avg_fam))[c(1:15,64),]
+```
+
+There are interesting differences in familiarity with AAVE words/phrases among these three groups. For people below the age of 20, the least familiar word is "catch the vapors" while the most familiar is "off the hook". Among non-white women, the least familiar word is a tie between "break someone out", "dukey rope", "plex", and "rollie", while the most familiar word is "feel me". Among white men older than 30, too many words to list were tied with a minimum average familiarity score of 1! Among this group, the most familiar word was "5-0".
+
+2.
+
+Here, to calculate differences in mean number of artists listed for each genre between the two demographic groups, I first converted the data to long format to get a genre variable and the mean count for each genre, by demographic group. Then I converted it to wide format to compute the average differences between each demographic group for each genre.
+
+```{r}
+# difference between mean number of artists listed (female - male)
+hiphop %>%
+  group_by(sex) %>%
+  summarize(across(intl:unclassifiable, mean)) %>%
+  pivot_longer(intl:unclassifiable,
+               names_to = 'Genre',
+               values_to = 'Mean_Count') %>%
+  group_by(Genre, sex) %>%
+  pivot_wider(names_from = sex,
+              values_from = Mean_Count,
+              names_prefix = 'GenreMean_') %>%
+  mutate(GenreMean_Diff = GenreMean_Female - GenreMean_Male)%>%
+  arrange(GenreMean_Diff)
+  
+```
+
+The genre with the greatest difference in popularity among men and women is rock, with men in this study reporting, on average, 1.13 more rock artists they listen to than women.
+
+```{r}
+# difference between mean number of artists listed (white - nonwhite)
+hiphop %>%
+  group_by(white) %>%
+  summarize(across(intl:unclassifiable, mean)) %>%
+  pivot_longer(intl:unclassifiable,
+               names_to = 'Genre',
+               values_to = 'Mean_Count') %>%
+  group_by(Genre, white) %>%
+  pivot_wider(names_from = white,
+              values_from = Mean_Count,
+              names_prefix = 'GenreMean_') %>%
+  mutate(GenreMean_Diff = GenreMean_white - GenreMean_nonwhite)%>%
+  arrange(GenreMean_Diff)
+```
+
+The genre with the greatest difference in popularity among white and non-white people is rock, with non-white participants in this study reporting, on average, 1.59 more international artists they listen to than white participants. Rock music follows close behind, with white participants listing, on average, 1.51 more rock artists than non-white participants.
+
+```{r}
+# difference between mean number of artists listed (below 21 - above 21)
+hiphop %>%
+  mutate(age_21 = ifelse(age < 21, 'below_21', 'above_21')) %>%
+  group_by(age_21) %>%
+  summarize(across(intl:unclassifiable, mean)) %>%
+  pivot_longer(intl:unclassifiable,
+               names_to = 'Genre',
+               values_to = 'Mean_Count') %>%
+  group_by(Genre, age_21) %>%
+  pivot_wider(names_from = age_21,
+              values_from = Mean_Count,
+              names_prefix = 'GenreMean_') %>%
+  mutate(GenreMean_Diff = GenreMean_below_21 - GenreMean_above_21)%>%
+  arrange(GenreMean_Diff)
+```
+
+The genre with the largest difference in popularity among participants above and below 21 years old is alternative. On average, participants above 21 listed 0.38 more alternative artists than participants below 21. Also, international music and hip hop music appear to be more popular with younger audiences than older audiences.
+
+# Use the Data
+
+1.
+
+```{r}
+aboveavg_hh_artists <- quantile(hiphop$hiphop, .75) # 3 or more hip hop artists were listed in 25% of trials
+#I would assume the people who listed 3 or more artists tend to be bigger hip hop fans
+
+# filter results to find hip hop words most recognized among the people who listen to the most hip hop artists 
+hiphop %>%
+  filter(hiphop >= aboveavg_hh_artists) %>%
+  group_by(word) %>%
+  mutate(avg_fam = mean(familiarity)) %>%
+  select(word, avg_fam) %>%
+  unique()%>%
+  arrange(desc(avg_fam))
+```
+Based on the word familiarity of individuals that listed the most hip hop artists they listen to, I would recommend that Aubrey include words and phrases such as: 'feel me', 'off the hook', 'hella', 'what it do', 'boo', and 'finna'. I'd advise he avoid the words and phrases 'dollar cab', 'humming', 'The Nation', 'break someone out', and 'domino', as these are less recognizable among hip hop fans.
+
+2.
+```{r}
+hiphop %>%
+  select(city) %>%
+  summary()
+
+# label each city as low, medium, or high population based on percentile
+hiphop$cityBinned <- cut(hiphop$city, 
+                         breaks = quantile(hiphop$city, probs = seq(0,1, by = 1/3)), 
+                         labels = c('low', 'medium', 'high'), 
+                         include.lowest= TRUE, 
+                         right = FALSE)
+
+#table(hiphop$cityBinned)
+```
+
+
+```{r}
+hiphop %>%
+  filter(word %in% c('boo', 'hella')) %>%
+  select(c('word', 'fam1', 'cityBinned'))%>%
+  group_by(word, cityBinned) %>%
+  summarize(Frequency = sum(fam1)) %>%
+  ggplot(aes(x= word, y = Frequency, fill=cityBinned)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  theme_minimal() +
+  scale_fill_brewer(name = "Population Size of\n Participant's City", palette = 'Blues', labels = c('Low', 'Medium', 'High')) +
+  scale_x_discrete(name = 'Word', labels = c('Boo', 'Hella')) +
+  ggtitle('Count of Participants Who Were Familiar With Word') +
+  labs(caption = '168 total participants')
+```
+
+I would recommend Aubrey use the title "Hella Bling" over the title "Hotline Boo" if he wants to appeal more to the higher population areas.
+
+3. 
+```{r}
+hiphop %>%
+  filter(sex == 'Male') %>%
+  filter(city >= 10000 & city <= 60000) %>%
+  filter(age >= 17 & age <= 23) %>%
+  filter(bieber == 5.0) %>%
+  head()
+```
+I suspect that Justin Bieber was subject p17 in this study, as he is the only one who named 5 Justin Bieber songs and meets the demographic criteria. Seeing that this individual also seems to like pop music, this would make sense.
