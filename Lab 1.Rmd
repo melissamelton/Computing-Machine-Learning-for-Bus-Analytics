@@ -1,0 +1,152 @@
+---
+title: "Lab 1"
+author: "Melissa Melton"
+date: "9/21/2022"
+output: rmdformats::html_clean
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+```
+
+# Setup
+
+```{r}
+library(tidyverse)
+library(patchwork)
+library(ggpubr)
+```
+
+Note: Click on images to view up close!
+
+# Task 1
+
+1. The x variable and y variable used here are income and life expectancy, respectively. Color is set to the four world regions. Size is set to population. 
+
+2.
+
+```{r}
+q1 = read.csv('Data/q1data.csv')
+```
+
+3.
+```{r}
+colorlabels = c('grey', 'darkturquoise', 'greenyellow', 'lightcoral', 'gold')
+regionlabels = c('NA', 'Africa', 'Americas', 'Asia', 'Europe')
+
+q1 %>% ggplot(aes(x = income, y=life_exp, color = four_regions, size = population))+ 
+  geom_point() +
+  geom_point(pch=21, color='black')+
+  scale_color_manual(name = 'World Regions', values=colorlabels, labels = regionlabels) + 
+  scale_size_continuous(range = c(0.5,12), name = 'Population') +
+  scale_x_continuous(name = 'Income (Per Person)', trans='log2', breaks = c(0,500, 1000, 2000, 4000, 8000, 16000, 32000, 64000), labels= c('0', '500', '1000', '2000', '4000', '8000', '16k', '32k', '64k')) +
+  scale_y_continuous(name = 'Life Expectancy (Years)', limits=c(20,90), breaks=seq(20,90,10)) + 
+  annotate('text', x=9000, y=40, label='2010', size= 30, col='darkgrey')
+```
+
+4. Since the x- and y-variables are both quantitative, I think a scatterplot is the best choice to represent these data. One other option is you could use 2 different plots of side-by-side boxplots, using the patchwork library. One will have boxplots of income colored by region, and the second will have boxplots of life expectancy colored by region. This geometry is useful for this data because the boxplot shows the spread of income and life expectancy for each region. However, population is no longer captured in this plot.
+
+```{r}
+colorlabels = c('grey', 'darkturquoise', 'greenyellow', 'lightcoral', 'gold')
+regionlabels = c('NA', 'Africa', 'Americas', 'Asia', 'Europe')
+
+income <- q1 %>% ggplot(aes(x= four_regions, y=income, fill = four_regions)) + 
+  geom_boxplot() + 
+  xlab('Region') + 
+  ylab('Income') + 
+  scale_x_discrete(labels = regionlabels) + 
+  scale_fill_manual(name = 'World Regions', labels=regionlabels, values = colorlabels)
+
+lifeexp <- q1 %>% ggplot(aes(x= four_regions, y=life_exp, fill = four_regions)) + 
+  geom_boxplot() + 
+  xlab('Region') + 
+  ylab('Life Expectancy') + 
+  scale_x_discrete(labels = regionlabels) + 
+  scale_fill_manual(name = 'World Regions', labels=regionlabels, values = colorlabels) + 
+  scale_y_continuous(limits = c(20,90))
+
+income/lifeexp
+```
+
+# Task 2
+
+1. The x-variable here is exports as a percentage of GDP, and the y-variable is imports as a percentage of GDP. The points are colored by the six regions
+
+2.
+
+Note: I had to convert the energy variable to be numeric and I chose to make values which were NA set to 0. This means on the graph they would be represented with the smallest possible circle. Without changing these values to no longer be NA, the graph was omitting 80 rows, and now it's only omitting 35 (which is due to null values for exports and imports).
+
+```{r}
+q2 <- read.csv('Data/q2data.csv')
+q2<- transform(q2, energy = as.numeric(energy))
+
+q2 <- q2 %>%
+   mutate(energy = if_else(is.na(energy), 0, energy))
+```
+
+3.
+```{r}
+q2 %>% ggplot(aes(x = exports, y=imports, color = four_regions, size = energy)) + 
+  geom_point() + 
+  #geom_point(pch=21, color='black')+
+  scale_color_manual(name = 'World Regions', values=colorlabels, labels = regionlabels)+
+  scale_size_continuous(name = 'Energy Use')+
+  scale_y_continuous(name = 'Imports (% of GDP)', limits = c(0,400), breaks = seq(0,400,50)) +
+  scale_x_continuous(name = 'Exports (% of GDP)', limits = c(0,220), breaks = seq(0,220,20)) +
+  annotate('text', x=115, y=250, label='1997', size= 30, col='darkgrey')
+```
+
+4. You could use overlayed histograms to illustrate the distribution of exports for each region, and do it again with imports, then display these graphs together. For the sake of demonstrating the relationship between imports and exports, the scatterplot is still best, since these are both quantitative variables. But the histogram is valuable because it shows the frequency at which different values of imports and exports occur for each region, and we can compare side-by-side. Similar to last time though when we were no longer capturing population in the boxplot, we aren't capturing differences in energy usage in this histogram. So, not as much information is conveyed as in the scatterplot.
+
+```{r}
+exports <- ggplot(q2, aes(x=exports, fill = four_regions)) +
+  geom_histogram(alpha=0.5) +
+  scale_fill_manual(name = 'Region', values = colorlabels, labels=regionlabels) + 
+  xlab('Exports (% of GDP)')
+
+imports <- ggplot(q2, aes(x=imports, fill = four_regions)) +
+  geom_histogram(alpha=0.5) +
+  scale_fill_manual(name = 'Region', values = colorlabels, labels=regionlabels) + 
+  xlab('Imports (% of GDP)')
+
+exports / imports
+```
+
+# Task 3
+
+1. The x-variable is the percent of the population using the Internet and the y-variable is GDP/capita.  The points are colored by the four regions and their size is relative to income.
+
+2.
+```{r}
+q3 <- read.csv('Data/q3data.csv')
+```
+
+3.
+```{r}
+options(scipen=10000)
+q3 %>% ggplot(aes(x = internet_users, y=gdp, color = four_regions, size = income)) + 
+  geom_point() + 
+  geom_point(pch=21, color='black')+
+  scale_color_manual(name = 'World Regions', values=colorlabels, labels = regionlabels)+
+  scale_size_continuous(name = 'Income')+
+  scale_x_continuous(name = 'Individuals Using the Internet (% of Population))', limits = c(0,100), breaks = seq(0,100,10)) +
+  scale_y_continuous(name = 'GDP/Capita (US$, Inflation-Adjusted)', trans='log2', breaks = c(0, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000)) +
+  annotate('text', x=50, y=3000, label='2001', size= 30, col='darkgrey')
+```
+
+4. One unique geometry that can be used as an alternative to a standard scatterplot is a scatterplot with a marginal boxplot. ggplot2 can't do this with multiple groups (i.e. 4 regions), but I used the ggscatterhist() function from the ggpubr library to fix this. I like this type of plot but for this data, I don't think it's super ideal due to the shape of the distributions. For each of the four groups, the distributions are mostly concentrated around the small values but since Europe has more variation, it's stretched out thin and hard to see. But I think a benefit of this type of plot is it more clearly shows how the distributions of values in each group compare, and for both the x and y variable.
+
+```{r}
+q3 %>% ggscatterhist(x='internet_users', y='gdp',
+                     color='four_regions', 
+                     size=3, alpha=0.6, 
+                     palette = colorlabels, 
+                     margin.params = list(fill='four_regions', color='black', size=.2), 
+                     xlab='Individuals Using the Internet', 
+                     ylab='GDP Per Capita', 
+                     legend.title='World Region')
+```
+
+
